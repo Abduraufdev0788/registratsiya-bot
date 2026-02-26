@@ -1,2 +1,0 @@
-# registratsiya-bot
-final project 
