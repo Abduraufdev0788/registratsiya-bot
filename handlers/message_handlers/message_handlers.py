@@ -9,7 +9,7 @@ from handlers.buttons.auth_buttons import confirm_button
 
 from state import Step
 import requests
-from config import BASE_URL
+from config import BASE_URL, BASE_SITE_URL, BASE_URL_REFRESH
 
 
 def register(update: Update, context: CallbackContext):
@@ -99,40 +99,100 @@ def get_avatar(update: Update, context: CallbackContext):
     return Step.confirm
 
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+import requests
+
+user_tokens = {}
+
 def confirm(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
 
-    if query.data == "confirm_true":
-        params = {
-            "telegram_id": update.effective_user.id,
-            "first_name":  context.user_data['first_name'],
-            "last_name" : context.user_data['last_name'],
-            "phone":context.user_data['phone'],
-            "avatar":context.user_data['photo_url']
-        }
+    user = update.effective_user
 
-        requests.post(url=BASE_URL, json=params)
+    # Username tekshiruv
+    if not user.username:
         query.edit_message_caption(
-        caption=(
-            "✅ <b>Ma'lumotlaringiz tasdiqlandi!</b>\n\n"
-            "Ro‘yxatdan o‘tish muvaffaqiyatli yakunlandi 🎉"
+            caption=(
+                "❗ <b>Xatolik</b>\n\n"
+                "Iltimos, Telegram username o‘rnating."
             ),
             parse_mode="HTML"
         )
-        context.user_data.clear()
         return ConversationHandler.END
 
-    query.edit_message_caption(
-    caption=(
-        "🔁 <b>Qayta kiritish</b>\n\n"
-        "Iltimos, ism va familiyangizni qayta yuboring.\n"
-        "Masalan: <code>Ali Valiyev</code>"
-    ),
-    parse_mode="HTML"
-    )
+    if query.data != "confirm_true":
+        return ConversationHandler.END
 
-    return Step.fullname
+    params = {
+        "telegram_id": user.id,
+        "username": user.username,
+        "first_name": context.user_data.get('first_name'),
+        "last_name": context.user_data.get('last_name'),
+        "phone_number": context.user_data.get('phone'),
+        "avatar": context.user_data.get('photo_url')
+    }
+
+    try:
+        response = requests.post(url=BASE_URL, json=params, timeout=10)
+
+        if response.status_code != 200:
+            query.edit_message_caption(
+                caption="❌ Server javobida xatolik yuz berdi.",
+                parse_mode="HTML"
+            )
+            return ConversationHandler.END
+
+        data = response.json()
+
+        access = data.get("access")
+        refresh = data.get("refresh")
+
+        if not access or not refresh:
+            query.edit_message_caption(
+                caption="❌ Token olinmadi.",
+                parse_mode="HTML"
+            )
+            return ConversationHandler.END
+
+        user_tokens[user.id] = {
+            "access": access,
+            "refresh": refresh
+        }
+        site_url = f"{BASE_SITE_URL}?token={access}"
+
+
+        keyboard = [
+            [InlineKeyboardButton("🌐 Saytga kirish", url=site_url)]
+        
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        query.edit_message_caption(
+            caption=(
+                "✅ <b>Muvaffaqiyatli!</b>\n\n"
+                "Ro‘yxatdan o‘tish yakunlandi 🎉\n\n"
+                "Quyidagi tugma orqali saytga o‘ting:"
+            ),
+            reply_markup=reply_markup,
+            parse_mode="HTML"
+        ),
+        update.message.reply_text(
+            "Saytni yangilash uchun /start buyrug'ini yuboring."
+        )
+
+        
+        context.user_data.clear()
+
+        return ConversationHandler.END
+
+    except requests.exceptions.RequestException:
+        query.edit_message_caption(
+            caption="❌ Server bilan bog‘lanishda xatolik yuz berdi.",
+            parse_mode="HTML"
+        )
+        return ConversationHandler.END
 
 
 def cancel(update: Update, context: CallbackContext):
@@ -142,3 +202,37 @@ def cancel(update: Update, context: CallbackContext):
     )
     context.user_data.clear()
     return ConversationHandler.END
+
+
+
+user_tokens = {}
+
+def login_user(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+
+    telegram_id = update.effective_user.id
+
+    response = requests.post(
+        url=BASE_URL,
+        json={"telegram_id": telegram_id}
+    )
+
+    if response.status_code != 200:
+        query.edit_message_text("❌ Login amalga oshmadi.")
+        return
+
+    data = response.json()
+
+    access = data["access"]
+    refresh = data["refresh"]
+
+    user_tokens[telegram_id] = {
+        "access": access,
+        "refresh": refresh
+    }
+
+    query.edit_message_text(
+        "✅ Muvaffaqiyatli login qilindi!\n\n"
+        "Endi tizimdan foydalanishingiz mumkin."
+    )

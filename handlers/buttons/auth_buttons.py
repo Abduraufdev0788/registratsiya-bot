@@ -15,3 +15,10 @@ def confirm_button():
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
+
+def login_button():
+    keyboard = [
+        [InlineKeyboardButton("🔐 Login qilish", callback_data="login_user")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
