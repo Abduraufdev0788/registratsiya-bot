@@ -9,7 +9,7 @@ from handlers.buttons.auth_buttons import confirm_button
 
 from state import Step
 import requests
-from config import BASE_URL, BASE_SITE_URL, BASE_URL_REFRESH
+from config import BASE_URL, BASE_URL_CHECK
 
 
 def register(update: Update, context: CallbackContext):
@@ -99,9 +99,6 @@ def get_avatar(update: Update, context: CallbackContext):
     return Step.confirm
 
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import requests
-
 user_tokens = {}
 
 def confirm(update: Update, context: CallbackContext):
@@ -136,6 +133,8 @@ def confirm(update: Update, context: CallbackContext):
     try:
         response = requests.post(url=BASE_URL, json=params, timeout=10)
 
+        print(response.status_code)
+
         if response.status_code != 200:
             query.edit_message_caption(
                 caption="❌ Server javobida xatolik yuz berdi.",
@@ -145,43 +144,28 @@ def confirm(update: Update, context: CallbackContext):
 
         data = response.json()
 
-        access = data.get("access")
-        refresh = data.get("refresh")
+        code = data.get("code")
 
-        if not access or not refresh:
+        if not code:
             query.edit_message_caption(
-                caption="❌ Token olinmadi.",
+                caption="❌ Code olinmadi.",
                 parse_mode="HTML"
             )
             return ConversationHandler.END
 
         user_tokens[user.id] = {
-            "access": access,
-            "refresh": refresh
+            "code": code
         }
-        site_url = f"{BASE_SITE_URL}?token={access}"
-
-
-        keyboard = [
-            [InlineKeyboardButton("🌐 Saytga kirish", url=site_url)]
-        
-        ]
-
-        reply_markup = InlineKeyboardMarkup(keyboard)
 
         query.edit_message_caption(
             caption=(
                 "✅ <b>Muvaffaqiyatli!</b>\n\n"
                 "Ro‘yxatdan o‘tish yakunlandi 🎉\n\n"
-                "Quyidagi tugma orqali saytga o‘ting:"
+                f"Sizning Kodingiz: <code>{code}</code>\n\n"
+                "Saytni yangilash uchun /start buyrug'ini yuboring."
             ),
-            reply_markup=reply_markup,
             parse_mode="HTML"
-        ),
-        update.message.reply_text(
-            "Saytni yangilash uchun /start buyrug'ini yuboring."
         )
-
         
         context.user_data.clear()
 
@@ -202,37 +186,3 @@ def cancel(update: Update, context: CallbackContext):
     )
     context.user_data.clear()
     return ConversationHandler.END
-
-
-
-user_tokens = {}
-
-def login_user(update: Update, context: CallbackContext):
-    query = update.callback_query
-    query.answer()
-
-    telegram_id = update.effective_user.id
-
-    response = requests.post(
-        url=BASE_URL,
-        json={"telegram_id": telegram_id}
-    )
-
-    if response.status_code != 200:
-        query.edit_message_text("❌ Login amalga oshmadi.")
-        return
-
-    data = response.json()
-
-    access = data["access"]
-    refresh = data["refresh"]
-
-    user_tokens[telegram_id] = {
-        "access": access,
-        "refresh": refresh
-    }
-
-    query.edit_message_text(
-        "✅ Muvaffaqiyatli login qilindi!\n\n"
-        "Endi tizimdan foydalanishingiz mumkin."
-    )

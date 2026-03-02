@@ -1,48 +1,35 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import CallbackContext
 import requests
 from handlers.buttons.auth_buttons import register_button
-
-from config import BASE_SITE_URL, BASE_URL_LOGIN
-
+from config import BASE_URL
 def start_bot(update: Update, context: CallbackContext):
     user = update.effective_user
-
-    # 1. check-user
     response = requests.get(
-        "http://127.0.0.1:8000/api/v1/auth/check-user/",
+        url=BASE_URL,
         params={"telegram_id": user.id}
     )
 
     data = response.json()
+    
 
-    if not data['exists'] == True:
+    if data['status'] == "User not found":
         update.message.reply_text(
             "Ro‘yxatdan o‘tish uchun tugmani bosing.",
             reply_markup=register_button()
         )
-    else:
-        login_response = requests.post(
-            url=BASE_URL_LOGIN,
-            json={"telegram_id": user.id}
-        )
+    elif data["status"] == "success":
+        update.message.reply_html(
+            f"""<b>👤 Sizning ma'lumotlaringiz:</b>
 
-        if login_response.status_code != 200:
-            update.message.reply_text("❌ Login xatosi.")
-            return
+🆔 <b>Telegram ID:</b> {data['user']['telegram_id']}
+👤 <b>Username:</b> {data['user']['username']}
+📛 <b>Ism:</b> {data['user']['first_name']}
+📛 <b>Familiya:</b> {data['user']['last_name']}
+📞 <b>Telefon:</b> {data['user']['phone_number']}"""
 
-        tokens = login_response.json()
-        access = tokens["access"]
 
-        # 3. Link beramiz
-        site_url = f"{BASE_SITE_URL}?token={access}"
-
-        keyboard = [
-            [InlineKeyboardButton("🌐 Profilga o‘tish", url=site_url)]
-        ]
-
-        update.message.reply_text(
-            "Profilingizga o‘tish uchun tugmani bosing 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+f"\n\n sizning kodingiz: <code>{data['code']}</code>"
+)
+    
     
