@@ -9,7 +9,7 @@ from handlers.buttons.auth_buttons import confirm_button
 
 from state import Step
 import requests
-from config import BASE_URL, BASE_URL_CHECK
+from config import BASE_URL
 
 
 def register(update: Update, context: CallbackContext):
@@ -51,7 +51,7 @@ def get_fullname(update: Update, context: CallbackContext):
         one_time_keyboard=True
     )
     )
-
+ 
     return Step.phone
 
 
@@ -142,27 +142,11 @@ def confirm(update: Update, context: CallbackContext):
             )
             return ConversationHandler.END
 
-        data = response.json()
-
-        code = data.get("code")
-
-        if not code:
-            query.edit_message_caption(
-                caption="❌ Code olinmadi.",
-                parse_mode="HTML"
-            )
-            return ConversationHandler.END
-
-        user_tokens[user.id] = {
-            "code": code
-        }
-
         query.edit_message_caption(
             caption=(
                 "✅ <b>Muvaffaqiyatli!</b>\n\n"
                 "Ro‘yxatdan o‘tish yakunlandi 🎉\n\n"
-                f"Sizning Kodingiz: <code>{code}</code>\n\n"
-                "Saytni yangilash uchun /start buyrug'ini yuboring."
+                "Kodni olish uchun /start buyrug'ini yuboring."
             ),
             parse_mode="HTML"
         )
